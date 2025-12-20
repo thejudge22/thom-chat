@@ -1,15 +1,24 @@
 import type { NanoGPTModel } from '$lib/backend/models/nano-gpt';
 
 export function supportsImages(model: NanoGPTModel): boolean {
+	if (model.architecture?.output_modalities && !model.architecture.output_modalities.includes('image')) {
+		return false;
+	}
 	return true;
 }
 
+export function supportsVideo(model: NanoGPTModel): boolean {
+	return model.architecture?.output_modalities?.includes('video') ?? false;
+}
+
 export function supportsReasoning(model: NanoGPTModel): boolean {
-	// NanoGPT models don't expose supported_parameters yet in our mock, 
-	// so we'll default to false or check id conventions if needed.
 	return false;
 }
 
 export function getImageSupportedModels(models: NanoGPTModel[]): NanoGPTModel[] {
 	return models.filter(supportsImages);
+}
+
+export function getVideoSupportedModels(models: NanoGPTModel[]): NanoGPTModel[] {
+	return models.filter(supportsVideo);
 }

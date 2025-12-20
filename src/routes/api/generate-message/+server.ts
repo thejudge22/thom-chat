@@ -27,6 +27,7 @@ import { performNanoGPTWebSearch } from '$lib/backend/web-search';
 import { scrapeUrlsFromMessage } from '$lib/backend/url-scraper';
 import { getUserMemory, upsertUserMemory } from '$lib/db/queries/user-memories';
 import { getNanoGPTModels } from '$lib/backend/models/nano-gpt';
+import { supportsVideo } from '$lib/utils/model-capabilities';
 
 // Set to true to enable debug logging
 const ENABLE_LOGGING = true;
@@ -668,6 +669,196 @@ ${attachedRules.map((r) => `- ${r.name}: ${r.rule}`).join('\n')}`;
 	}
 }
 
+async function generateVideoResponse({
+	conversationId,
+	userId,
+	startTime,
+	model,
+	apiKey,
+	abortSignal,
+}: {
+	conversationId: string;
+	userId: string;
+	startTime: number;
+	apiKey: string;
+	model: Doc<'user_enabled_models'>;
+	abortSignal?: AbortSignal;
+}) {
+	log('Starting Video response generation in background', startTime);
+
+	if (abortSignal?.aborted) {
+		log('Video response generation aborted before starting', startTime);
+		return;
+	}
+
+	// Get all messages for this conversation
+	const conversationMessages = await db.query.messages.findMany({
+		where: eq(messages.conversationId, conversationId),
+		orderBy: [asc(messages.createdAt)],
+	});
+
+	// Get the last user message
+	const lastUserMessage = conversationMessages.filter((m) => m.role === 'user').pop();
+	if (!lastUserMessage) {
+		log('No user message found for video generation', startTime);
+		return;
+	}
+
+	const prompt = lastUserMessage.content;
+	// Check for images in the last message
+	const messageImages = lastUserMessage.images as Array<{
+		url: string;
+		storage_id: string;
+		fileName?: string;
+	}> | null;
+
+	let imageDataUrl: string | undefined;
+	let imageUrl: string | undefined;
+
+	if (messageImages && messageImages.length > 0) {
+		// Use the first image
+		const img = messageImages[0];
+		if (!img) return; // Typescript safety
+		if (img.url.startsWith('data:')) {
+			imageDataUrl = img.url;
+		} else if (img.url.startsWith('http')) {
+			imageUrl = img.url;
+		} else {
+			// Resolve storage ID
+			const storageRecord = await db.query.storage.findFirst({
+				where: eq(storage.id, img.storage_id),
+			});
+
+			if (storageRecord) {
+				try {
+					const fileBuffer = readFileSync(storageRecord.path);
+					const base64 = fileBuffer.toString('base64');
+					imageDataUrl = `data:${storageRecord.mimeType};base64,${base64}`;
+				} catch (e) {
+					console.error(`Failed to read file for image ${img.storage_id}:`, e);
+				}
+			}
+		}
+	}
+
+	// Create assistant message (placeholder)
+	const assistantMessageId = generateId();
+	const now = new Date();
+
+	await db.insert(messages).values({
+		id: assistantMessageId,
+		conversationId,
+		modelId: model.modelId,
+		provider: Provider.NanoGPT,
+		content: 'Generating video... (this may take a few minutes)',
+		role: 'assistant',
+		createdAt: now,
+	});
+
+	try {
+		// Submit video generation request
+		const response = await fetch('https://nano-gpt.com/api/generate-video', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'x-api-key': apiKey
+			},
+			body: JSON.stringify({
+				model: model.modelId,
+				prompt: prompt,
+				...(imageDataUrl ? { imageDataUrl } : {}),
+				...(imageUrl ? { imageUrl } : {})
+			})
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.message || error.error || 'Failed to submit video generation request');
+		}
+
+		const { runId } = await response.json();
+		log(`Video generation started with runId: ${runId}`, startTime);
+
+		// Poll for completion
+		const maxAttempts = 120; // 10 minutes (5s interval)
+		const delayMs = 5000;
+
+		for (let i = 0; i < maxAttempts; i++) {
+			if (abortSignal?.aborted) {
+				break;
+			}
+
+			await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+			const statusRes = await fetch(`https://nano-gpt.com/api/generate-video/status?runId=${runId}&modelSlug=${model.modelId}`, {
+				headers: { 'x-api-key': apiKey }
+			});
+
+			if (!statusRes.ok) continue;
+
+			const statusData = await statusRes.json();
+			const status = statusData.data?.status || statusData.status; // backend returns data.status
+
+			if (status === 'COMPLETED' || status === 'succeeded') {
+				// Debug status data
+				console.log('[GenerateMessage] Video Status Data:', JSON.stringify(statusData, null, 2));
+
+				let videoUrl = statusData.data?.output?.video?.url || statusData.output?.video?.url || statusData.url;
+
+				if (videoUrl && videoUrl.startsWith('/')) {
+					videoUrl = `https://nano-gpt.com${videoUrl}`;
+				}
+				if (videoUrl) {
+					const videoCost = statusData.data?.cost || statusData.cost || 0;
+
+					await db.update(messages)
+						.set({
+							content: `Here is your video:\n\n${videoUrl}`,
+							contentHtml: `<video src="${videoUrl}" controls class="max-w-full rounded-lg"></video>`,
+							generationId: runId,
+							costUsd: videoCost
+						})
+						.where(eq(messages.id, assistantMessageId));
+
+					await db
+						.update(conversations)
+						.set({
+							generating: false,
+							updatedAt: new Date(),
+							costUsd: sql`COALESCE(${conversations.costUsd}, 0) + ${videoCost}`,
+						})
+						.where(eq(conversations.id, conversationId));
+
+					log(`Video generation completed. Cost: $${videoCost}`, startTime);
+				}
+				break;
+			} else if (status === 'FAILED') {
+				throw new Error(statusData.data?.error || 'Video generation failed');
+			}
+		}
+
+	} catch (e: any) {
+		await handleGenerationError({
+			error: `Video generation failed: ${e.message}`,
+			conversationId,
+			messageId: assistantMessageId,
+			startTime,
+		});
+	} finally {
+		// Update conversation generating status
+		await db
+			.update(conversations)
+			.set({
+				generating: false,
+				updatedAt: new Date(),
+			})
+			.where(eq(conversations.id, conversationId));
+
+		generationAbortControllers.delete(conversationId);
+	}
+}
+
+
 
 export const POST: RequestHandler = async ({ request }) => {
 	const startTime = Date.now();
@@ -763,10 +954,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		log('Model not found or not enabled', startTime);
 		return error(400, 'Model not found or not enabled');
 	}
-
-	// We update references to modelRecord below?
-	// The code uses modelRecord later. I should update it or use effectiveModelRecord.
-	// The code below uses `modelRecord` in `generateAIResponse`.
 
 	const finalModelRecord = effectiveModelRecord;
 
@@ -871,14 +1058,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		await db.update(conversations).set({ generating: true }).where(eq(conversations.id, conversationId));
 	}
 
-	// Check if the selected model is an image model
-	// We already fetched models if we auto-enabled, but maybe not if we didn't.
-	// To be cleaner and avoid double fetching, let's reuse if possible, but the scope is tricky.
-	// We'll just fetch again, it's not super expensive (likely cached by fetch dedupe or fast enough).
-	// Or we could have lifted the fetch up.
-	// But since I can't easily refactor the whole file in chunks, I'll stick to fetching.
-	// Actually, I can use a variable declared outside if I wanted.. but let's just fetch, it's safer for now.
-
 	const modelsResult = await getNanoGPTModels();
 	let isImageModel = false;
 
@@ -923,10 +1102,6 @@ export const POST: RequestHandler = async ({ request }) => {
 						log('Prepared input image for img2img', startTime);
 					}
 				}
-
-				// We effectively use fetch here to support custom parameters like imageDataUrl
-				// which might not be typed in the OpenAI Node SDK or might be stripped.
-				// The user provided python example uses requests.post, so fetch is safe.
 
 				const payload: any = {
 					model: args.model_id,
@@ -1048,32 +1223,66 @@ export const POST: RequestHandler = async ({ request }) => {
 	const abortController = new AbortController();
 	generationAbortControllers.set(conversationId, abortController);
 
+	// Check capabilities
+	const allNanoModelsResult = await getNanoGPTModels();
+	let supportsVideoGeneration = false;
+	if (allNanoModelsResult.isOk()) {
+		const modelInfo = allNanoModelsResult.value.find((m) => m.id === finalModelRecord.modelId);
+		if (modelInfo) {
+			supportsVideoGeneration = supportsVideo(modelInfo);
+		}
+	}
+
 	// Start AI response generation in background - don't await
-	generateAIResponse({
-		conversationId,
-		userId,
-		startTime,
-		model: finalModelRecord,
-		apiKey: actualKey,
-		rules: rulesRecords,
-		userSettingsData: userSettingsRecord ?? null,
-		abortSignal: abortController.signal,
-		reasoningEffort: args.reasoning_effort,
-		webSearchDepth: args.web_search_mode && args.web_search_mode !== 'off' ? args.web_search_mode : undefined,
-	})
-		.catch(async (error) => {
-			log(`Background AI response generation error: ${error}`, startTime);
-			// Reset generating status on error
-			try {
-				await db.update(conversations).set({ generating: false }).where(eq(conversations.id, conversationId));
-			} catch (e) {
-				log(`Failed to reset generating status after error: ${e}`, startTime);
-			}
+	if (supportsVideoGeneration) {
+		generateVideoResponse({
+			conversationId,
+			userId,
+			startTime,
+			apiKey: actualKey,
+			model: finalModelRecord,
+			abortSignal: abortController.signal,
 		})
-		.finally(() => {
-			// Clean up the cached AbortController
-			generationAbortControllers.delete(conversationId);
-		});
+			.catch(async (error) => {
+				log(`Background Video response generation error: ${error}`, startTime);
+				// Reset generating status on error
+				try {
+					await db.update(conversations).set({ generating: false }).where(eq(conversations.id, conversationId));
+				} catch (e) {
+					log(`Failed to reset generating status after error: ${e}`, startTime);
+				}
+			})
+			.finally(() => {
+				// Clean up the cached AbortController
+				generationAbortControllers.delete(conversationId);
+			});
+	} else {
+		generateAIResponse({
+			conversationId,
+			userId,
+			startTime,
+			model: finalModelRecord,
+			apiKey: actualKey,
+			rules: rulesRecords,
+			userSettingsData: userSettingsRecord ?? null,
+			abortSignal: abortController.signal,
+			reasoningEffort: args.reasoning_effort,
+			webSearchDepth: args.web_search_mode && args.web_search_mode !== 'off' ? args.web_search_mode : undefined,
+		})
+			.catch(async (error) => {
+				log(`Background AI response generation error: ${error}`, startTime);
+				// Reset generating status on error
+				try {
+					await db.update(conversations).set({ generating: false }).where(eq(conversations.id, conversationId));
+				} catch (e) {
+					log(`Failed to reset generating status after error: ${e}`, startTime);
+				}
+			})
+			.finally(() => {
+				// Clean up the cached AbortController
+				generationAbortControllers.delete(conversationId);
+			});
+	}
 
 	log('Response sent, AI generation started in background', startTime);
 	return response({ ok: true, conversation_id: conversationId });

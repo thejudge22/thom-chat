@@ -23,9 +23,10 @@ export interface NanoGPTModel {
 export function getNanoGPTModels() {
     return ResultAsync.fromPromise(
         (async () => {
-            const [textModelsRes, imageModelsRes] = await Promise.all([
+            const [textModelsRes, imageModelsRes, videoModelsRes] = await Promise.all([
                 fetch('https://nano-gpt.com/api/v1/models?detailed=true'),
-                fetch('https://nano-gpt.com/api/models/image')
+                fetch('https://nano-gpt.com/api/models/image'),
+                fetch('https://nano-gpt.com/api/models/video')
             ]);
 
             if (!textModelsRes.ok) {
@@ -78,7 +79,31 @@ export function getNanoGPTModels() {
                 }
             }
 
-            return [...textModels, ...imageModels] as NanoGPTModel[];
+            let videoModels: NanoGPTModel[] = [];
+            if (videoModelsRes.ok) {
+                const videoData = await videoModelsRes.json();
+                if (videoData.models && videoData.models.video) {
+                    videoModels = Object.entries(videoData.models.video).map(([id, m]: [string, any]) => ({
+                        id: id,
+                        name: m.name || id,
+                        created: m.dateAdded ? new Date(m.dateAdded).getTime() : Date.now(),
+                        description: m.description || '',
+                        architecture: {
+                            input_modalities: ['text', 'image'], // Video models often accept text and image
+                            output_modalities: ['video'],
+                            tokenizer: 'unknown',
+                        },
+                        pricing: {
+                            prompt: '0',
+                            completion: '0',
+                            image: '0',
+                            request: JSON.stringify(m.cost) || '0'
+                        }
+                    }));
+                }
+            }
+
+            return [...textModels, ...imageModels, ...videoModels] as NanoGPTModel[];
         })(),
         (e) => `[nano-gpt] Failed to fetch models: ${e}`
     );

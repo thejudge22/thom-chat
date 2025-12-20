@@ -7,12 +7,13 @@
 	import { settings } from '$lib/state/settings.svelte';
 	import { Provider } from '$lib/types';
 	import { fuzzysearch } from '$lib/utils/fuzzy-search';
-	import { supportsImages, supportsReasoning } from '$lib/utils/model-capabilities';
+	import { supportsImages, supportsReasoning, supportsVideo } from '$lib/utils/model-capabilities';
 	import { capitalize } from '$lib/utils/strings';
 	import { cn } from '$lib/utils/utils';
 	import BrainIcon from '~icons/lucide/brain';
 	import SearchIcon from '~icons/lucide/search';
 	import EyeIcon from '~icons/lucide/eye';
+	import VideoIcon from '~icons/lucide/video';
 	import { Command } from 'bits-ui';
 	import * as Popover from '$lib/components/ui/popover';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
@@ -257,6 +258,20 @@
 											</div>
 										{/snippet}
 										Supports reasoning
+									</Tooltip>
+								{/if}
+
+								{#if nanoGPTModel && supportsVideo(nanoGPTModel)}
+									<Tooltip>
+										{#snippet trigger(tooltip)}
+											<div
+												{...tooltip.trigger}
+												class="rounded-md border-blue-500 bg-blue-500/50 p-1 text-blue-400"
+											>
+												<VideoIcon class="size-3" />
+											</div>
+										{/snippet}
+										Supports video generation
 									</Tooltip>
 								{/if}
 
