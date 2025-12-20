@@ -776,8 +776,10 @@ async function generateVideoResponse({
 			throw new Error(error.message || error.error || 'Failed to submit video generation request');
 		}
 
-		const { runId } = await response.json();
-		log(`Video generation started with runId: ${runId}`, startTime);
+		const initData = await response.json();
+		const runId = initData.runId;
+		const initialCost = initData.cost || 0;
+		log(`Video generation started with runId: ${runId}. Initial cost: ${initialCost}`, startTime);
 
 		// Poll for completion
 		const maxAttempts = 120; // 10 minutes (5s interval)
@@ -800,16 +802,14 @@ async function generateVideoResponse({
 			const status = statusData.data?.status || statusData.status; // backend returns data.status
 
 			if (status === 'COMPLETED' || status === 'succeeded') {
-				// Debug status data
-				console.log('[GenerateMessage] Video Status Data:', JSON.stringify(statusData, null, 2));
-
 				let videoUrl = statusData.data?.output?.video?.url || statusData.output?.video?.url || statusData.url;
 
 				if (videoUrl && videoUrl.startsWith('/')) {
 					videoUrl = `https://nano-gpt.com${videoUrl}`;
 				}
 				if (videoUrl) {
-					const videoCost = statusData.data?.cost || statusData.cost || 0;
+					const statusCost = statusData.data?.cost || statusData.cost;
+					const videoCost = statusCost !== undefined ? statusCost : initialCost;
 
 					await db.update(messages)
 						.set({
