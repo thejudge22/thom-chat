@@ -464,6 +464,7 @@ ${attachedRules.map((r) => `- ${r.name}: ${r.rule}`).join('\n')}`;
 				temperature: 0.7,
 				stream: true,
 				reasoning_effort: reasoningEffort,
+				stream_options: { include_usage: true },
 			},
 			{
 				signal: abortSignal,
@@ -490,6 +491,7 @@ ${attachedRules.map((r) => `- ${r.name}: ${r.rule}`).join('\n')}`;
 	let chunkCount = 0;
 	let generationId: string | null = null;
 	const annotations: Annotation[] = [];
+	let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
 	try {
 		for await (const chunk of stream) {
@@ -509,6 +511,11 @@ ${attachedRules.map((r) => `- ${r.name}: ${r.rule}`).join('\n')}`;
 			if (!content && !reasoning) continue;
 
 			generationId = chunk.id;
+
+			// Extract usage from the final chunk (appears when include_usage is true)
+			if (chunk.usage) {
+				usage = chunk.usage;
+			}
 
 			// Update message content in database
 			await db
@@ -538,27 +545,31 @@ ${attachedRules.map((r) => `- ${r.name}: ${r.rule}`).join('\n')}`;
 			(e) => `Failed to render HTML: ${e}`
 		);
 
-		const generationStatsResult = await retryResult(
-			() => getGenerationStats(generationId!, apiKey),
-			{
-				delay: 500,
-				retries: 2,
-				startTime,
-				fnName: 'getGenerationStats',
+		// Calculate cost from usage and model pricing
+		let costUsd: number | undefined = undefined;
+		let tokenCount: number | undefined = undefined;
+
+		if (usage) {
+			tokenCount = usage.completion_tokens;
+
+			// Fetch model pricing to calculate cost
+			const modelsResult = await getNanoGPTModels();
+			if (modelsResult.isOk()) {
+				const modelInfo = modelsResult.value.find((m) => m.id === modelId);
+				if (modelInfo?.pricing) {
+					const promptPricePerMillion = parseFloat(modelInfo.pricing.prompt) || 0;
+					const completionPricePerMillion = parseFloat(modelInfo.pricing.completion) || 0;
+					const promptTokens = usage.prompt_tokens ?? 0;
+					const completionTokens = usage.completion_tokens ?? 0;
+
+					// Calculate cost: (tokens / 1M) * price_per_million
+					costUsd = (promptTokens * promptPricePerMillion + completionTokens * completionPricePerMillion) / 1_000_000;
+					log(`Background: Calculated cost: $${costUsd.toFixed(6)} (prompt: ${promptTokens}, completion: ${completionTokens})`, startTime);
+				}
 			}
-		);
-
-		if (generationStatsResult.isErr()) {
-			log(`Background: Failed to get generation stats: ${generationStatsResult.error}`, startTime);
+		} else {
+			log('Background: No usage data available from stream', startTime);
 		}
-
-		// just default so we don't blow up
-		const generationStats = generationStatsResult.unwrapOr({
-			tokens_completion: undefined,
-			total_cost: undefined,
-		});
-
-		log('Background: Got generation stats', startTime);
 
 		const contentHtmlResult = await contentHtmlResultPromise;
 
@@ -570,8 +581,8 @@ ${attachedRules.map((r) => `- ${r.name}: ${r.rule}`).join('\n')}`;
 		await db
 			.update(messages)
 			.set({
-				tokenCount: generationStats.tokens_completion,
-				costUsd: generationStats.total_cost,
+				tokenCount,
+				costUsd,
 				generationId,
 				contentHtml: contentHtmlResult.unwrapOr(null),
 			})
@@ -583,9 +594,10 @@ ${attachedRules.map((r) => `- ${r.name}: ${r.rule}`).join('\n')}`;
 			.set({
 				generating: false,
 				updatedAt: new Date(),
-				costUsd: sql`${conversations.costUsd} + ${generationStats.total_cost ?? 0}`,
+				costUsd: sql`COALESCE(${conversations.costUsd}, 0) + ${costUsd ?? 0}`,
 			})
 			.where(eq(conversations.id, conversationId));
+
 
 		// Update persistent memory if enabled
 		if (userSettingsData?.persistentMemoryEnabled) {
@@ -643,19 +655,6 @@ ${attachedRules.map((r) => `- ${r.name}: ${r.rule}`).join('\n')}`;
 	}
 }
 
-
-async function getGenerationStats(generationId: string, apiKey: string) {
-	return ResultAsync.fromPromise(
-		(async () => {
-			const res = await fetch(`https://nano-gpt.com/api/v1/generations/${generationId}`, {
-				headers: { Authorization: `Bearer ${apiKey}` }
-			});
-			if (!res.ok) throw new Error(res.statusText);
-			return await res.json();
-		})(),
-		e => `${e}`
-	);
-}
 
 export const POST: RequestHandler = async ({ request }) => {
 	const startTime = Date.now();
@@ -940,6 +939,10 @@ export const POST: RequestHandler = async ({ request }) => {
 
 				const response = await res.json();
 
+				// Extract cost from image generation response
+				const imageCost = response.cost ?? 0;
+				log(`Image generation cost: $${imageCost}`, startTime);
+
 				const image = response.data?.[0];
 				if (!image?.b64_json && !image?.url) {
 					throw new Error('No image data returned details: ' + JSON.stringify(image));
@@ -993,7 +996,7 @@ export const POST: RequestHandler = async ({ request }) => {
 						content: markdownContent,
 						contentHtml: null,
 						tokenCount: 0,
-						costUsd: 0, // could attempt to parse cost from headers or response if available
+						costUsd: imageCost,
 					})
 					.where(eq(messages.id, assistantMessageId));
 
@@ -1002,6 +1005,7 @@ export const POST: RequestHandler = async ({ request }) => {
 					.set({
 						generating: false,
 						updatedAt: new Date(),
+						costUsd: sql`COALESCE(${conversations.costUsd}, 0) + ${imageCost}`,
 					})
 					.where(eq(conversations.id, conversationId));
 

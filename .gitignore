@@ -36,3 +36,4 @@ src/lib/backend/convex/_generated
 *.key
 Caddyfile
 docker-prod.yml
+nanogpt-docs

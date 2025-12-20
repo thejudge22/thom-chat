@@ -24,7 +24,7 @@ export function getNanoGPTModels() {
     return ResultAsync.fromPromise(
         (async () => {
             const [textModelsRes, imageModelsRes] = await Promise.all([
-                fetch('https://nano-gpt.com/api/v1/models'),
+                fetch('https://nano-gpt.com/api/v1/models?detailed=true'),
                 fetch('https://nano-gpt.com/api/models/image')
             ]);
 
@@ -35,15 +35,24 @@ export function getNanoGPTModels() {
             const { data: textData } = await textModelsRes.json();
             const textModels = Array.isArray(textData) ? textData.map((m: any) => ({
                 id: m.id,
-                name: m.id,
+                name: m.name || m.id,
                 created: m.created || Date.now(),
-                description: '',
+                description: m.description || '',
+                context_length: m.context_length,
                 architecture: {
-                    input_modalities: ['text'],
+                    input_modalities: m.capabilities?.vision ? ['text', 'image'] : ['text'],
                     output_modalities: ['text'],
                     tokenizer: 'unknown',
                 },
+                // Pricing from detailed=true: prompt/completion in USD per million tokens
+                pricing: m.pricing ? {
+                    prompt: String(m.pricing.prompt ?? 0),
+                    completion: String(m.pricing.completion ?? 0),
+                    image: '0',
+                    request: '0'
+                } : undefined,
             })) : [];
+
 
             let imageModels: NanoGPTModel[] = [];
             if (imageModelsRes.ok) {
