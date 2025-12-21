@@ -40,6 +40,10 @@
 			title: 'API Keys',
 			href: '/account/api-keys',
 		},
+		{
+			title: 'Analytics',
+			href: '/account/analytics',
+		},
 	];
 
 	type Shortcut = {

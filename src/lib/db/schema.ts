@@ -250,6 +250,92 @@ export const assistants = sqliteTable('assistants', {
     index('assistants_user_id_idx').on(table.userId)
 ]);
 
+// Performance tracking tables
+export const messageRatings = sqliteTable(
+    'message_ratings',
+    {
+        id: text('id').primaryKey(),
+        messageId: text('message_id')
+            .notNull()
+            .references(() => messages.id, { onDelete: 'cascade' }),
+        userId: text('user_id')
+            .notNull()
+            .references(() => user.id, { onDelete: 'cascade' }),
+        rating: integer('rating'), // 1-5 or null
+        thumbs: text('thumbs', { enum: ['up', 'down'] }),
+        categories: text('categories', { mode: 'json' }).$type<string[]>(), // ['accurate', 'helpful', etc.]
+        feedback: text('feedback'), // optional text
+        createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+        updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    },
+    (table) => [
+        index('message_ratings_message_id_idx').on(table.messageId),
+        index('message_ratings_user_id_idx').on(table.userId),
+    ]
+);
+
+export const messageInteractions = sqliteTable(
+    'message_interactions',
+    {
+        id: text('id').primaryKey(),
+        messageId: text('message_id')
+            .notNull()
+            .references(() => messages.id, { onDelete: 'cascade' }),
+        userId: text('user_id')
+            .notNull()
+            .references(() => user.id, { onDelete: 'cascade' }),
+        action: text('action', { enum: ['regenerate', 'edit', 'copy', 'share'] }).notNull(),
+        metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>(), // store additional context
+        createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    },
+    (table) => [
+        index('message_interactions_message_id_idx').on(table.messageId),
+        index('message_interactions_user_id_idx').on(table.userId),
+        index('message_interactions_action_idx').on(table.action),
+    ]
+);
+
+export const modelPerformanceStats = sqliteTable(
+    'model_performance_stats',
+    {
+        id: text('id').primaryKey(),
+        userId: text('user_id')
+            .notNull()
+            .references(() => user.id, { onDelete: 'cascade' }),
+        modelId: text('model_id').notNull(),
+        provider: text('provider').notNull(),
+
+        // Aggregated stats (updated periodically)
+        totalMessages: integer('total_messages').notNull().default(0),
+        avgRating: real('avg_rating'),
+        thumbsUpCount: integer('thumbs_up_count').notNull().default(0),
+        thumbsDownCount: integer('thumbs_down_count').notNull().default(0),
+        regenerateCount: integer('regenerate_count').notNull().default(0),
+        avgResponseTime: real('avg_response_time'), // milliseconds
+        avgTokens: real('avg_tokens'),
+        totalCost: real('total_cost').notNull().default(0),
+        errorCount: integer('error_count').notNull().default(0),
+
+        // Category counts
+        accurateCount: integer('accurate_count').notNull().default(0),
+        helpfulCount: integer('helpful_count').notNull().default(0),
+        creativeCount: integer('creative_count').notNull().default(0),
+        fastCount: integer('fast_count').notNull().default(0),
+        costEffectiveCount: integer('cost_effective_count').notNull().default(0),
+
+        lastUpdated: integer('last_updated', { mode: 'timestamp' }).notNull(),
+    },
+    (table) => [
+        index('model_performance_user_id_idx').on(table.userId),
+        index('model_performance_model_provider_idx').on(table.modelId, table.provider),
+        index('model_performance_user_model_provider_idx').on(
+            table.userId,
+            table.modelId,
+            table.provider
+        ),
+    ]
+);
+
 // ============================================================================
 // Relations
 // ============================================================================
@@ -265,6 +351,9 @@ export const userRelations = relations(user, ({ many, one }) => ({
     storage: many(storage),
     memories: one(userMemories),
     assistants: many(assistants),
+    messageRatings: many(messageRatings),
+    messageInteractions: many(messageInteractions),
+    modelPerformanceStats: many(modelPerformanceStats),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -325,11 +414,13 @@ export const conversationsRelations = relations(conversations, ({ one, many }) =
     }),
 }));
 
-export const messagesRelations = relations(messages, ({ one }) => ({
+export const messagesRelations = relations(messages, ({ one, many }) => ({
     conversation: one(conversations, {
         fields: [messages.conversationId],
         references: [conversations.id],
     }),
+    ratings: many(messageRatings),
+    interactions: many(messageInteractions),
 }));
 
 export const storageRelations = relations(storage, ({ one }) => ({
@@ -349,6 +440,35 @@ export const userMemoriesRelations = relations(userMemories, ({ one }) => ({
 export const assistantsRelations = relations(assistants, ({ one }) => ({
     user: one(user, {
         fields: [assistants.userId],
+        references: [user.id],
+    }),
+}));
+
+export const messageRatingsRelations = relations(messageRatings, ({ one }) => ({
+    message: one(messages, {
+        fields: [messageRatings.messageId],
+        references: [messages.id],
+    }),
+    user: one(user, {
+        fields: [messageRatings.userId],
+        references: [user.id],
+    }),
+}));
+
+export const messageInteractionsRelations = relations(messageInteractions, ({ one }) => ({
+    message: one(messages, {
+        fields: [messageInteractions.messageId],
+        references: [messages.id],
+    }),
+    user: one(user, {
+        fields: [messageInteractions.userId],
+        references: [user.id],
+    }),
+}));
+
+export const modelPerformanceStatsRelations = relations(modelPerformanceStats, ({ one }) => ({
+    user: one(user, {
+        fields: [modelPerformanceStats.userId],
         references: [user.id],
     }),
 }));
@@ -379,3 +499,9 @@ export type UserMemory = typeof userMemories.$inferSelect;
 export type NewUserMemory = typeof userMemories.$inferInsert;
 export type Assistant = typeof assistants.$inferSelect;
 export type NewAssistant = typeof assistants.$inferInsert;
+export type MessageRating = typeof messageRatings.$inferSelect;
+export type NewMessageRating = typeof messageRatings.$inferInsert;
+export type MessageInteraction = typeof messageInteractions.$inferSelect;
+export type NewMessageInteraction = typeof messageInteractions.$inferInsert;
+export type ModelPerformanceStats = typeof modelPerformanceStats.$inferSelect;
+export type NewModelPerformanceStats = typeof modelPerformanceStats.$inferInsert;
