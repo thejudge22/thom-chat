@@ -78,6 +78,13 @@
       "when": 1766340708080,
       "tag": "0010_bitter_stone_men",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1766343032105,
+      "tag": "0011_rapid_bloodstrike",
+      "breakpoints": true
     }
   ]
 }

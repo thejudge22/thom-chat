@@ -20,6 +20,7 @@
 	import { Branch, BranchAndRegen } from '$lib/components/icons';
 	import { settings } from '$lib/state/settings.svelte';
 	import ShinyText from '$lib/components/animations/shiny-text.svelte';
+	import MessageRating from '$lib/components/ui/message-rating.svelte';
 	import ChevronRightIcon from '~icons/lucide/chevron-right';
 	import { AnnotationSchema, type Annotation } from '$lib/types';
 	import ExternalLinkIcon from '~icons/lucide/external-link';
@@ -59,6 +60,11 @@
 	}
 
 	async function createBranchedConversation() {
+		// Log regenerate interaction
+		if (message.role === 'user') {
+			await logInteraction('regenerate');
+		}
+
 		const res = await ResultAsync.fromPromise(
 			mutate<{ conversationId: string }>(api.conversations.createBranched.url, {
 				action: 'branch',
@@ -110,6 +116,68 @@
 	});
 
 	let showReasoning = $state(false);
+
+	async function handleRating(data: {
+		thumbs?: 'up' | 'down';
+		rating?: number;
+		categories?: string[];
+		feedback?: string;
+	}) {
+		if (!session.current?.user?.id) {
+			console.warn('[message] Cannot submit rating: user not logged in');
+			return;
+		}
+
+		try {
+			const response = await fetch('/api/db/message-ratings', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					messageId: message.id,
+					...data,
+				}),
+			});
+			
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+				console.error('[message] Failed to submit rating:', errorData);
+				// TODO: Show toast notification to user
+			}
+		} catch (error) {
+			console.error('[message] Error submitting rating:', error);
+			// TODO: Show toast notification to user
+		}
+	}
+
+	async function logInteraction(action: 'copy' | 'regenerate' | 'share') {
+		if (!session.current?.user?.id) {
+			// Silently skip logging if user not logged in
+			return;
+		}
+
+		try {
+			const response = await fetch('/api/db/message-interactions', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					messageId: message.id,
+					action,
+				}),
+			});
+			
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+				console.error(`[message] Failed to log ${action} interaction:`, errorData);
+			}
+		} catch (error) {
+			console.error(`[message] Error logging ${action} interaction:`, error);
+			// Silently fail - interaction logging is non-critical
+		}
+	}
 </script>
 
 {#if message.role !== 'system' && !(message.role === 'assistant' && message.content.length === 0 && message.reasoning?.length === 0 && !message.error)}
@@ -276,6 +344,7 @@
 						<CopyButton
 							class={cn('order-1 size-7', { 'order-2': message.role === 'user' })}
 							text={message.content}
+							onclick={() => logInteraction('copy')}
 							{...tooltip.trigger}
 						/>
 					{/snippet}
@@ -305,6 +374,11 @@
 				{/if}
 			{/if}
 		</div>
+		{#if message.role === 'assistant' && message.content.length > 0 && !message.error}
+			<div class="mt-2">
+				<MessageRating messageId={message.id} onRate={handleRating} />
+			</div>
+		{/if}
 	</div>
 
 	{#if message.images && message.images.length > 0}
