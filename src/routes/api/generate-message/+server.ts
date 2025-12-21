@@ -150,7 +150,7 @@ If its a simple hi, just name it "Greeting" or something like that.
 
 	const titleResult = await ResultAsync.fromPromise(
 		openai.chat.completions.create({
-			model: 'zai-org/GLM-4.5-Air',
+			model: 'Qwen/Qwen3-Next-80B-A3B-Instruct',
 			messages: [{ role: 'user', content: titlePrompt }],
 			max_tokens: 20,
 			temperature: 0.5,
