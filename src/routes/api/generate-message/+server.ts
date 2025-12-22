@@ -257,6 +257,14 @@ async function generateAIResponse({
 	// Perform web search if enabled (only for Linkup, Tavily uses model suffix)
 	let searchContext: string | null = null;
 	let webSearchCost = 0;
+
+	// Track Tavily search cost (handled via model suffix, but we still track the cost)
+	if (useTavily && webSearchDepth) {
+		// Tavily pricing: Deep search $0.016, Web search $0.008
+		webSearchCost = webSearchDepth === 'deep' ? 0.016 : 0.008;
+		log(`Background: Tavily web search cost: $${webSearchCost}`, startTime);
+	}
+
 	if (webSearchEnabled && lastUserMessage && !useTavily) {
 		log('Background: Performing Linkup web search', startTime);
 		try {
@@ -594,9 +602,10 @@ ${attachedRules.map((r) => `- ${r.name}: ${r.rule}`).join('\n')}`;
 			tokenCount = usage.completion_tokens;
 
 			// Fetch model pricing to calculate cost
+			// Use the original model ID (without online/tavily suffix) for pricing lookup
 			const modelsResult = await getNanoGPTModels();
 			if (modelsResult.isOk()) {
-				const modelInfo = modelsResult.value.find((m) => m.id === modelId);
+				const modelInfo = modelsResult.value.find((m) => m.id === model.modelId);
 				if (modelInfo?.pricing) {
 					const promptPricePerMillion = parseFloat(modelInfo.pricing.prompt) || 0;
 					const completionPricePerMillion = parseFloat(modelInfo.pricing.completion) || 0;
