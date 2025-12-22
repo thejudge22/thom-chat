@@ -13,7 +13,7 @@
 - Yarn -> Bun
 - Openrouter -> Nano-GPT (nano-gpt.com)
 - Theme more closely resembles T3 Chat
-- Nano-GPT Web Search / Deep Search
+- Nano-GPT Web Search / Deep Search (Linkup / Tavily)
 - Nano-GPT Web Scraping when you enter a URL (adds to context)
 - Nano-GPT Context Memory (Single Chat)
 - Cross-Conversation Memory (All Chats)
