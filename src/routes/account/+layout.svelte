@@ -7,11 +7,12 @@
 	import ArrowLeftIcon from '~icons/lucide/arrow-left';
 	import { Avatar } from 'melt/components';
 	import { Kbd } from '$lib/components/ui/kbd/index.js';
-	import { cmdOrCtrl } from '$lib/hooks/is-mac.svelte.js';
+	import { formatKeybind } from '$lib/hooks/is-mac.svelte.js';
 	import { useCachedQuery, api } from '$lib/cache/cached-query.svelte.js';
 	import { session } from '$lib/state/session.svelte.js';
 	import { cn } from '$lib/utils/utils.js';
 	import { useLastChat } from '$lib/state/last-chat.svelte.js';
+	import { keybinds, KEYBIND_LABELS, KEYBIND_ACTIONS } from '$lib/state/keybinds.svelte';
 
 	let { data, children } = $props();
 
@@ -41,38 +42,16 @@
 			href: '/account/api-keys',
 		},
 		{
+			title: 'Keybinds',
+			href: '/account/keybinds',
+		},
+		{
 			title: 'Analytics',
 			href: '/account/analytics',
 		},
 	];
-
-	type Shortcut = {
-		name: string;
-		keys: string[];
-	};
-
-	const shortcuts: Shortcut[] = [
-		{
-			name: 'Toggle Sidebar',
-			keys: [cmdOrCtrl, 'B'],
-		},
-		{
-			name: 'New Chat',
-			keys: [cmdOrCtrl, 'Shift', 'O'],
-		},
-		{
-			name: 'Search Messages',
-			keys: [cmdOrCtrl, 'K'],
-		},
-		{
-			name: 'Scroll to bottom',
-			keys: [cmdOrCtrl, 'D'],
-		},
-		{
-			name: 'Open Model Picker',
-			keys: [cmdOrCtrl, 'Shift', 'M'],
-		},
-	];
+	// Use first 5 actions for the shortcuts display (global ones)
+	const displayedActions = KEYBIND_ACTIONS.slice(0, 5);
 
 	async function signOut() {
 		await authClient.signOut();
@@ -138,14 +117,17 @@
 					</span>
 				</div>
 				<div class="mt-4 flex w-full flex-col gap-2">
-					<span class="text-sm font-medium">Keyboard Shortcuts</span>
+					<div class="flex items-center justify-between">
+						<span class="text-sm font-medium">Keyboard Shortcuts</span>
+						<a href="/account/keybinds" class="text-primary text-xs hover:underline">Edit</a>
+					</div>
 					<div class="flex flex-col gap-1">
-						{#each shortcuts as { name, keys } (name)}
+						{#each displayedActions as action (action)}
 							<div class="flex place-items-center justify-between">
-								<span class="text-muted-foreground text-sm">{name}</span>
+								<span class="text-muted-foreground text-sm">{KEYBIND_LABELS[action]}</span>
 
 								<div class="flex place-items-center gap-1">
-									{#each keys as key (key)}
+									{#each formatKeybind(keybinds[action]) as key (key)}
 										<Kbd>{key}</Kbd>
 									{/each}
 								</div>

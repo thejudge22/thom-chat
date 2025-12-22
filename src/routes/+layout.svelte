@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { shortcut } from '$lib/actions/shortcut.svelte';
+	import { shortcut, getKeybindOptions } from '$lib/actions/shortcut.svelte';
 	import GlobalModal from '$lib/components/ui/modal/global-modal.svelte';
 	import { models } from '$lib/state/models.svelte';
 	import { ModeWatcher } from 'mode-watcher';
@@ -50,9 +50,7 @@
 	}}
 />
 
-<svelte:window
-	use:shortcut={{ ctrl: true, shift: true, key: 'o', callback: () => goto('/chat') }}
-/>
+<svelte:window use:shortcut={getKeybindOptions('newChat', () => goto('/chat'))} />
 
 <ModeWatcher />
 {#if browser}

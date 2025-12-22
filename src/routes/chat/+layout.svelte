@@ -39,7 +39,7 @@
 	import { callGenerateMessage } from '../api/generate-message/call.js';
 	import { ModelPicker } from '$lib/components/model-picker';
 	import SearchModal from './search-modal.svelte';
-	import { shortcut } from '$lib/actions/shortcut.svelte.js';
+	import { shortcut, getKeybindOptions } from '$lib/actions/shortcut.svelte.js';
 	import { mergeAttrs } from 'melt';
 	import { callEnhancePrompt } from '../api/enhance-prompt/call.js';
 	import ShinyText from '$lib/components/animations/shiny-text.svelte';
@@ -501,7 +501,7 @@
 </svelte:head>
 
 <svelte:window
-	use:shortcut={[{ ctrl: true, key: 'd', callback: () => scrollState.scrollToBottom() }]}
+	use:shortcut={getKeybindOptions('scrollToBottom', () => scrollState.scrollToBottom())}
 />
 
 <Sidebar.Root

@@ -16,10 +16,11 @@
 	import VideoIcon from '~icons/lucide/video';
 	import { Command } from 'bits-ui';
 	import * as Popover from '$lib/components/ui/popover';
-	import { shortcut } from '$lib/actions/shortcut.svelte';
+	import { shortcut, getKeybindOptions } from '$lib/actions/shortcut.svelte';
 	import { Button } from '../ui/button';
 	import { Kbd } from '../ui/kbd';
-	import { cmdOrCtrl } from '$lib/hooks/is-mac.svelte';
+	import { cmdOrCtrl, formatKeybind } from '$lib/hooks/is-mac.svelte';
+	import { keybinds, DEFAULT_KEYBINDS } from '$lib/state/keybinds.svelte';
 	import { mutate } from '$lib/client/mutation.svelte';
 	import { ResultAsync } from 'neverthrow';
 	import PinIcon from '~icons/lucide/pin';
@@ -72,6 +73,13 @@
 	let open = $state(false);
 
 	let activeModel = $state('');
+
+	// Auto-select first model when picker opens
+	$effect(() => {
+		if (open && filteredModels.length > 0 && !activeModel) {
+			activeModel = filteredModels[0]?.modelId ?? '';
+		}
+	});
 
 	// Model name formatting utility
 	const termReplacements = [
@@ -142,14 +150,7 @@
 	const pinnedModels = $derived(enabledArr.filter((m) => isPinned(m)));
 </script>
 
-<svelte:window
-	use:shortcut={{
-		ctrl: true,
-		shift: true,
-		key: 'm',
-		callback: () => (open = true),
-	}}
-/>
+<svelte:window use:shortcut={getKeybindOptions('openModelPicker', () => (open = true))} />
 
 <Popover.Root bind:open>
 	<Popover.Trigger
@@ -197,21 +198,59 @@
 			<Command.Root
 				class={cn('flex h-full w-full flex-col overflow-hidden')}
 				bind:value={activeModel}
+				shouldFilter={false}
 			>
 				<label class="border-border relative flex items-center gap-2 border-b px-4 py-3 text-sm">
 					<SearchIcon class="text-muted-foreground" />
 					<Command.Input
 						class="w-full outline-none"
 						placeholder="Search models..."
+						bind:value={search}
 						onkeydown={(e) => {
-							if (e.ctrlKey || e.metaKey) {
-									if (e.key === 'u') {
-									if (activeModelInfo) {
-										e.preventDefault();
-										e.stopPropagation();
-										togglePin(activeModelInfo.id);
-									}
+							// Arrow key navigation
+							if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+								e.preventDefault();
+								const currentIndex = filteredModels.findIndex(m => m.modelId === activeModel);
+								let newIndex: number;
+								
+								if (e.key === 'ArrowDown') {
+									newIndex = currentIndex < filteredModels.length - 1 ? currentIndex + 1 : 0;
+								} else {
+									newIndex = currentIndex > 0 ? currentIndex - 1 : filteredModels.length - 1;
 								}
+								
+								const newModel = filteredModels[newIndex];
+								if (newModel) {
+									activeModel = newModel.modelId;
+								}
+								return;
+							}
+
+							// Enter to select
+							if (e.key === 'Enter' && activeModel) {
+								e.preventDefault();
+								modelSelected(activeModel);
+								return;
+							}
+							
+							// Get pin config with fallback to defaults
+							const pinConfig = keybinds.pinModel ?? DEFAULT_KEYBINDS.pinModel;
+							
+							// Check modifiers - compare as booleans
+							const hasCtrlOrMeta = e.ctrlKey || e.metaKey;
+							const ctrlRequired = pinConfig.ctrl === true;
+							const shiftRequired = pinConfig.shift === true;
+							const altRequired = pinConfig.alt === true;
+							
+							const ctrlMatch = ctrlRequired === hasCtrlOrMeta;
+							const shiftMatch = shiftRequired === e.shiftKey;
+							const altMatch = altRequired === e.altKey;
+							const keyMatch = e.key.toLowerCase() === String(pinConfig.key).toLowerCase();
+							
+							if (ctrlMatch && shiftMatch && altMatch && keyMatch && activeModelInfo) {
+								e.preventDefault();
+								e.stopPropagation();
+								togglePin(activeModelInfo.id);
 							}
 						}}
 					/>
@@ -234,9 +273,11 @@
 								'relative scroll-m-36 select-none',
 								'data-selected:bg-accent/50 data-selected:text-accent-foreground',
 								'h-10 items-center justify-between',
-								disabled && 'opacity-50'
+								disabled && 'opacity-50',
+								activeModel === model.modelId && "bg-accent/50 text-accent-foreground"
 							)}
 							onSelect={() => modelSelected(model.modelId)}
+							onmouseenter={() => (activeModel = model.modelId)}
 						>
 							<div class="flex items-center gap-2">
 								<p class="font-fake-proxima text-sm leading-tight font-bold">
@@ -297,8 +338,9 @@
 								{isPinned(activeModelInfo) ? 'Unpin' : 'Pin'}
 							</span>
 							<span>
-								<Kbd size="xs">{cmdOrCtrl}</Kbd>
-								<Kbd size="xs">U</Kbd>
+								{#each formatKeybind(keybinds.pinModel) as key}
+									<Kbd size="xs">{key}</Kbd>
+								{/each}
 							</span>
 						</Button>
 					</div>

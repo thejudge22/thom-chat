@@ -3,6 +3,25 @@
 */
 
 import { createAttachmentKey } from 'svelte/attachments';
+import { keybinds, type KeybindAction } from '$lib/state/keybinds.svelte';
+
+/**
+ * Get shortcut options for a keybind action from the persisted keybinds store.
+ * This enables user-customizable keyboard shortcuts.
+ */
+export function getKeybindOptions(
+	action: KeybindAction,
+	callback: (e: KeyboardEvent) => void
+): Options {
+	const config = keybinds[action];
+	return {
+		key: config.key,
+		ctrl: config.ctrl,
+		shift: config.shift,
+		alt: config.alt,
+		callback,
+	};
+}
 
 export type Options = {
 	/** Event to use to detect the shortcut @default 'keydown' */
