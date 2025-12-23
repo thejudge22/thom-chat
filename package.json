@@ -82,7 +82,6 @@
 		"@fontsource/instrument-serif": "^5.2.8",
 		"@types/node": "^25.0.3",
 		"better-auth": "1.4.9",
-		"better-sqlite3": "^12.5.0",
 		"drizzle-orm": "^0.45.1",
 		"hastscript": "^9.0.1",
 		"markdown-it-async": "^2.2.0",
