@@ -388,7 +388,7 @@ async function generateAIResponse({
 			}> | null;
 			let processedImages: Array<{ type: 'image_url'; image_url: { url: string } }> = [];
 			let processedDocuments: Array<{ type: 'text'; text: string }> = [];
-			
+
 			// Process images if present
 			if (messageImages && messageImages.length > 0 && m.role === 'user') {
 				processedImages = await Promise.all(
@@ -441,7 +441,7 @@ async function generateAIResponse({
 				fileName?: string;
 				fileType: 'pdf' | 'markdown' | 'text';
 			}> | null;
-			
+
 			if (messageDocuments && messageDocuments.length > 0 && m.role === 'user') {
 				processedDocuments = await Promise.all(
 					messageDocuments.map(async (doc) => {
@@ -506,13 +506,13 @@ async function generateAIResponse({
 				return {
 					role: 'user' as const,
 					content: [
-						{ type: 'text' as const, text: m.content }, 
-						...processedImages, 
+						{ type: 'text' as const, text: m.content },
+						...processedImages,
 						...processedDocuments
 					],
 				};
 			}
-			
+
 			return {
 				role: m.role as 'user' | 'assistant' | 'system',
 				content: m.content,
@@ -1189,6 +1189,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			content: args.message,
 			role: 'user',
 			images: args.images ?? null,
+			documents: args.documents ?? null,
 			webSearchEnabled: effectiveWebSearchMode && effectiveWebSearchMode !== 'off'
 				? true
 				: effectiveWebSearchEnabled ?? false,
@@ -1228,8 +1229,8 @@ export const POST: RequestHandler = async ({ request }) => {
 				role: 'user',
 				modelId: args.model_id,
 				reasoningEffort: args.reasoning_effort,
-        images: args.images ?? null,
-        documents: args.documents ?? null,
+				images: args.images ?? null,
+				documents: args.documents ?? null,
 				webSearchEnabled: args.web_search_mode && args.web_search_mode !== 'off'
 					? true
 					: effectiveWebSearchEnabled ?? false,
