@@ -13,7 +13,7 @@ import {
 } from '$lib/db/schema';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { eq, and, asc, sql } from 'drizzle-orm';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { auth } from '$lib/auth';
 import { Provider, type Annotation } from '$lib/types';
 import { error, json, type RequestHandler } from '@sveltejs/kit';
@@ -1268,6 +1268,11 @@ export const POST: RequestHandler = async ({ request }) => {
 				const extension = (mimeType.split('/')[1] || 'png').replace(/[^a-zA-Z0-9]/g, '') || 'png';
 				const filename = `${storageId}.${extension}`;
 				const filepath = join(UPLOAD_DIR, filename);
+
+				// Prevent path traversal
+				if (!resolve(filepath).startsWith(resolve(UPLOAD_DIR))) {
+					throw new Error('Invalid file path');
+				}
 
 				writeFileSync(filepath, buffer);
 
