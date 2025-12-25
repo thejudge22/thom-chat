@@ -48,10 +48,16 @@
 		if (!session.current?.user.id) return;
 
 		const res = await ResultAsync.fromPromise(
-			mutate(api.user_settings.set.url, {
-				action: 'update',
-				privacyMode: v,
-			}),
+			mutate(
+				api.user_settings.set.url,
+				{
+					action: 'update',
+					privacyMode: v,
+				},
+				{
+					invalidatePatterns: [api.user_settings.get.url],
+				}
+			),
 			(e) => e
 		);
 
@@ -63,10 +69,16 @@
 		if (!session.current?.user.id) return;
 
 		const res = await ResultAsync.fromPromise(
-			mutate(api.user_settings.set.url, {
-				action: 'update',
-				contextMemoryEnabled: v,
-			}),
+			mutate(
+				api.user_settings.set.url,
+				{
+					action: 'update',
+					contextMemoryEnabled: v,
+				},
+				{
+					invalidatePatterns: [api.user_settings.get.url],
+				}
+			),
 			(e) => e
 		);
 
@@ -78,10 +90,16 @@
 		if (!session.current?.user.id) return;
 
 		const res = await ResultAsync.fromPromise(
-			mutate(api.user_settings.set.url, {
-				action: 'update',
-				persistentMemoryEnabled: v,
-			}),
+			mutate(
+				api.user_settings.set.url,
+				{
+					action: 'update',
+					persistentMemoryEnabled: v,
+				},
+				{
+					invalidatePatterns: [api.user_settings.get.url],
+				}
+			),
 			(e) => e
 		);
 
@@ -93,10 +111,16 @@
 		if (!session.current?.user.id) return;
 
 		const res = await ResultAsync.fromPromise(
-			mutate(api.user_settings.set.url, {
-				action: 'update',
-				youtubeTranscriptsEnabled: v,
-			}),
+			mutate(
+				api.user_settings.set.url,
+				{
+					action: 'update',
+					youtubeTranscriptsEnabled: v,
+				},
+				{
+					invalidatePatterns: [api.user_settings.get.url],
+				}
+			),
 			(e) => e
 		);
 
@@ -108,11 +132,17 @@
 
 		karakeepSaving = true;
 		const res = await ResultAsync.fromPromise(
-			mutate(api.user_settings.set.url, {
-				action: 'update',
-				karakeepUrl,
-				karakeepApiKey,
-			}),
+			mutate(
+				api.user_settings.set.url,
+				{
+					action: 'update',
+					karakeepUrl,
+					karakeepApiKey,
+				},
+				{
+					invalidatePatterns: [api.user_settings.get.url],
+				}
+			),
 			(e) => e
 		);
 

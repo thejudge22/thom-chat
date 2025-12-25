@@ -133,6 +133,20 @@
 			(page.params.id ? currentConversationQuery.isLoading : false)
 	);
 
+	// Track when generation completes to refresh sidebar for title updates
+	let wasGeneratingInLayout = $state(false);
+	$effect(() => {
+		if (isGenerating) {
+			wasGeneratingInLayout = true;
+		} else if (wasGeneratingInLayout) {
+			wasGeneratingInLayout = false;
+			// Title is generated asynchronously after response completes
+			// Trigger multiple delayed refreshes to catch the title update
+			setTimeout(() => invalidateQueryPattern(api.conversations.get.url), 2000);
+			setTimeout(() => invalidateQueryPattern(api.conversations.get.url), 5000);
+		}
+	});
+
 	async function stopGeneration() {
 		if (!page.params.id || !session.current?.session.token) return;
 

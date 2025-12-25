@@ -68,6 +68,32 @@
 		session_token: session.current?.session.token ?? '',
 	});
 
+	// Track previous generating state to detect when generation completes
+	let wasGenerating = $state(false);
+	const hasGeneratingConversation = $derived(
+		conversationsQuery.data?.some((c) => c.generating) ?? false
+	);
+
+	// Poll for updates while a conversation is generating (to catch title updates)
+	// and do a final refresh when generation completes
+	$effect(() => {
+		if (hasGeneratingConversation) {
+			wasGenerating = true;
+			// Poll every 3 seconds while generating to catch title updates
+			const interval = setInterval(() => {
+				invalidateQueryPattern(api.conversations.get.url);
+			}, 3000);
+			return () => clearInterval(interval);
+		} else if (wasGenerating) {
+			// Generation just completed, do a final refresh to catch the title
+			wasGenerating = false;
+			// Small delay to ensure title generation has completed
+			setTimeout(() => {
+				invalidateQueryPattern(api.conversations.get.url);
+			}, 1000);
+		}
+	});
+
 	function groupConversationsByTime(conversations: Doc<'conversations'>[]) {
 		const now = Date.now();
 		const oneDay = 24 * 60 * 60 * 1000;
