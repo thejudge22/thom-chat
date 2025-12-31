@@ -12,7 +12,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import Tooltip from '$lib/components/ui/tooltip.svelte';
 	import { mutate } from '$lib/client/mutation.svelte';
-	import { api } from '$lib/cache/cached-query.svelte';
+	import { api, invalidateQueryPattern } from '$lib/cache/cached-query.svelte';
 	import { session } from '$lib/state/session.svelte';
 	import { ResultAsync } from 'neverthrow';
 	import { goto } from '$app/navigation';
@@ -22,6 +22,10 @@
 	import ShinyText from '$lib/components/animations/shiny-text.svelte';
 	import MessageRating from '$lib/components/ui/message-rating.svelte';
 	import ChevronRightIcon from '~icons/lucide/chevron-right';
+	import ChevronDownIcon from '~icons/lucide/chevron-down';
+	import RefreshCwIcon from '~icons/lucide/refresh-cw';
+	import PencilIcon from '~icons/lucide/pencil';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { AnnotationSchema, type Annotation } from '$lib/types';
 	import ExternalLinkIcon from '~icons/lucide/external-link';
 	import GlobeIcon from '~icons/lucide/globe';
@@ -178,6 +182,49 @@
 			// Silently fail - interaction logging is non-critical
 		}
 	}
+
+	let isEditing = $state(false);
+	let editedContent = $state('');
+
+	function startEditing() {
+		editedContent = message.content;
+		isEditing = true;
+	}
+
+	function cancelEditing() {
+		isEditing = false;
+		editedContent = '';
+	}
+
+	async function saveMessage() {
+		if (editedContent === message.content) {
+			cancelEditing();
+			return;
+		}
+
+		try {
+			const res = await fetch('/api/db/messages', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					action: 'updateContent',
+					messageId: message.id,
+					content: editedContent,
+				}),
+			});
+
+			if (res.ok) {
+				// Invalidate queries to refresh UI
+				invalidateQueryPattern(api.messages.getAllFromConversation.url);
+				isEditing = false;
+			} else {
+				console.error('Failed to update message');
+				// TODO: Show toast
+			}
+		} catch (e) {
+			console.error('Error updating message:', e);
+		}
+	}
 </script>
 
 {#if message.role !== 'system' && !(message.role === 'assistant' && message.content.length === 0 && message.reasoning?.length === 0 && !message.error)}
@@ -263,7 +310,28 @@
 			</div>
 		{/if}
 		<div class={style({ role: message.role as 'user' | 'assistant' })}>
-			{#if message.error}
+			{#if isEditing}
+				<div class="flex min-w-[300px] flex-col gap-2">
+					<textarea
+						bind:value={editedContent}
+						class="min-h-[100px] w-full resize-y rounded-md bg-transparent p-1 text-inherit outline-none focus:ring-0"
+						onkeydown={(e) => {
+							if (e.key === 'Enter' && !e.shiftKey) {
+								e.preventDefault();
+								saveMessage();
+							} else if (e.key === 'Escape') {
+								cancelEditing();
+							}
+						}}
+					></textarea>
+					<div class="mt-1 flex justify-end gap-2">
+						<Button size="sm" variant="ghost" onclick={cancelEditing} class="h-7 text-xs"
+							>Cancel</Button
+						>
+						<Button size="sm" onclick={saveMessage} class="h-7 text-xs">Save</Button>
+					</div>
+				</div>
+			{:else if message.error}
 				<div class="text-destructive">
 					<pre class="!bg-sidebar"><code>{message.error}</code></pre>
 				</div>
@@ -376,6 +444,26 @@
 					Copy
 				</Tooltip>
 			{/if}
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger
+					class={cn(
+						'hover:bg-accent order-3 flex size-7 items-center justify-center rounded-md transition-colors',
+						{ 'order-3': message.role === 'user' }
+					)}
+				>
+					<ChevronDownIcon class="size-4" />
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="start" class="w-40">
+					<DropdownMenu.Item onclick={startEditing} class="cursor-pointer gap-2">
+						<PencilIcon class="size-4" />
+						<span>Edit</span>
+					</DropdownMenu.Item>
+					<DropdownMenu.Item onclick={createBranchedConversation} class="cursor-pointer gap-2">
+						<RefreshCwIcon class="size-4" />
+						<span>Regenerate</span>
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
 			{#if message.role === 'assistant'}
 				{#if message.modelId !== undefined}
 					<span class="text-muted-foreground text-xs">{message.modelId}</span>
