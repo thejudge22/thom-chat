@@ -60,7 +60,7 @@
 
 The follow-up questions feature automatically generates 2-3 contextual questions after each AI response. Key details:
 
-- **Generation**: Uses Qwen/Qwen3-Next-80B-A3B-Instruct model via Nano-GPT
+- **Generation**: Uses zai-org/GLM-4.5-Air model via Nano-GPT
 - **Display**: Shows 1 second after message generation completes
 - **Persistence**: Suggestions are stored in the database and shown when loading historical conversations
 - **User Control**: Can be toggled on/off in Account Settings

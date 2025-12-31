@@ -74,6 +74,7 @@ const reqBodySchema = z
 			)
 			.optional(),
 		reasoning_effort: z.enum(['low', 'medium', 'high']).optional(),
+		temporary: z.boolean().optional(),
 	})
 	.refine(
 		(data) => {
@@ -158,7 +159,7 @@ async function generateConversationTitle({
 	});
 
 	// Create a prompt for title generation using user message and assistant response
-const titlePrompt = `Summarize this conversation into a 3-5 word title that captures the core topic.
+	const titlePrompt = `Summarize this conversation into a 3-5 word title that captures the core topic.
 
 User: """${userMessage}"""
 Assistant: """${assistantMessage}"""
@@ -173,7 +174,7 @@ Requirements:
 
 	const titleResult = await ResultAsync.fromPromise(
 		openai.chat.completions.create({
-			model: 'Qwen/Qwen3-Next-80B-A3B-Instruct',
+			model: 'zai-org/GLM-4.5-Air',
 			messages: [{ role: 'user', content: titlePrompt }],
 			max_tokens: 20,
 			temperature: 0.5,
@@ -220,6 +221,7 @@ async function generateAIResponse({
 	webSearchProvider,
 	webFeaturesDisabled,
 	userName,
+	isTemporary,
 }: {
 	conversationId: string;
 	userId: string;
@@ -234,6 +236,7 @@ async function generateAIResponse({
 	webSearchProvider?: 'linkup' | 'tavily' | 'exa' | 'kagi';
 	webFeaturesDisabled?: boolean;
 	userName?: string;
+	isTemporary?: boolean;
 }) {
 	log('Starting AI response generation in background', startTime);
 
@@ -1207,6 +1210,14 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	let conversationId = args.conversation_id;
+	const isTemporaryChat = args.temporary === true;
+
+	// For temporary chats, we use a temp: prefixed ID but still process normally
+	// The temporary chat won't be saved - we'll create a regular conversation but mark it for deletion
+	if (isTemporaryChat && !conversationId) {
+		log('Temporary chat mode - chat will not be saved to history', startTime);
+	}
+
 	if (!conversationId) {
 		// technically zod should catch this but just in case
 		if (args.message === undefined) {
@@ -1226,6 +1237,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			pinned: false,
 			costUsd: 0,
 			assistantId: args.assistant_id,
+			temporary: isTemporaryChat,
 			createdAt: now,
 			updatedAt: now,
 		});
@@ -1516,6 +1528,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			webSearchProvider: args.web_search_provider,
 			webFeaturesDisabled: usingServerKey && isWebDisabledForServerKey(),
 			userName: session.user?.name ?? undefined,
+			isTemporary: isTemporaryChat,
 		})
 			.catch(async (error) => {
 				log(`Background AI response generation error: ${error}`, startTime);

@@ -6,4 +6,5 @@ export const settings = createPersistedObj('settings', {
 	webSearchProvider: 'linkup' as 'linkup' | 'tavily' | 'exa' | 'kagi',
 	reasoningEffort: 'low' as 'low' | 'medium' | 'high',
 	theme: undefined as string | undefined,
+	temporaryMode: false as boolean,
 });

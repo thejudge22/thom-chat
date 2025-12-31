@@ -1,12 +1,16 @@
 import { db, generateId } from '../index';
 import { conversations, messages, type Conversation, type Message } from '../schema';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, or, isNull } from 'drizzle-orm';
 import enhancedSearch from '$lib/utils/fuzzy-search';
 import { getFirstSentence } from '$lib/utils/strings';
 
 export async function getUserConversations(userId: string): Promise<Conversation[]> {
     return db.query.conversations.findMany({
-        where: eq(conversations.userId, userId),
+        where: and(
+            eq(conversations.userId, userId),
+            // Filter out temporary conversations (temporary is false or null)
+            or(eq(conversations.temporary, false), isNull(conversations.temporary))
+        ),
         orderBy: [desc(conversations.updatedAt)],
     });
 }
@@ -222,6 +226,17 @@ export async function deleteConversation(conversationId: string, userId: string)
 export async function deleteAllConversations(userId: string): Promise<void> {
     // Messages will be cascade deleted due to foreign key constraint
     await db.delete(conversations).where(eq(conversations.userId, userId));
+}
+
+// Delete all temporary conversations for a user (called on session start)
+export async function deleteTemporaryConversations(userId: string): Promise<void> {
+    // Messages will be cascade deleted due to foreign key constraint
+    await db.delete(conversations).where(
+        and(
+            eq(conversations.userId, userId),
+            eq(conversations.temporary, true)
+        )
+    );
 }
 
 export async function getConversationMessages(

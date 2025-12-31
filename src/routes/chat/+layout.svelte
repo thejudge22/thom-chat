@@ -57,6 +57,8 @@
 	import * as casing from '$lib/utils/casing.js';
 	import BotIcon from '~icons/lucide/bot';
 	import PlusIcon from '~icons/lucide/plus';
+	import GhostIcon from '~icons/lucide/ghost';
+	import { isTemporaryConversation } from '$lib/state/temporary-chat.svelte';
 
 	let { children } = $props();
 
@@ -77,6 +79,11 @@
 				invalidatePatterns: [api.user_enabled_models.get_enabled.url],
 			}
 		);
+
+		// Cleanup temporary conversations from previous sessions
+		fetch('/api/cleanup-temp-conversations', { method: 'POST' }).catch(() => {
+			// Silently ignore cleanup errors
+		});
 	});
 
 	const assistantsQuery = useCachedQuery<Assistant[]>(api.assistants.list, {
@@ -243,6 +250,7 @@
 				web_search_provider: settings.webSearchProvider,
 				assistant_id: selectedAssistantId.current || undefined,
 				reasoning_effort: currentModelSupportsReasoning ? settings.reasoningEffort : undefined,
+				temporary: settings.temporaryMode || undefined,
 			});
 
 			if (res.isErr()) {
@@ -808,6 +816,14 @@
 				class="group absolute right-0 bottom-4 left-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-1 px-4"
 				bind:this={textareaWrapper}
 			>
+				{#if settings.temporaryMode}
+					<div
+						class="mb-2 flex items-center justify-center gap-2 rounded-lg bg-orange-500/20 px-3 py-1.5 text-sm text-orange-500"
+					>
+						<GhostIcon class="size-4" />
+						<span>Temporary Mode — Messages won't be saved</span>
+					</div>
+				{/if}
 				<div class="text-muted-foreground/60 mb-2 text-center text-[10px]">
 					Powered by <a href="https://nano-gpt.com" class="hover:text-foreground underline"
 						>Nano-GPT</a
@@ -1147,6 +1163,25 @@
 												<BrainIcon class="size-4" />
 											</button>
 										{/if}
+										<Tooltip>
+											{#snippet trigger(tooltip)}
+												<button
+													type="button"
+													class={cn(
+														'bg-secondary/50 hover:bg-secondary text-muted-foreground flex size-8 items-center justify-center rounded-lg transition-colors',
+														settings.temporaryMode &&
+															'border-orange-500/50 bg-orange-500/20 text-orange-500'
+													)}
+													onclick={() => (settings.temporaryMode = !settings.temporaryMode)}
+													{...tooltip.trigger}
+												>
+													<GhostIcon class="size-4" />
+												</button>
+											{/snippet}
+											{settings.temporaryMode
+												? "Temporary Mode: ON (chats won't be saved)"
+												: 'Temporary Mode: OFF'}
+										</Tooltip>
 									</div>
 								</div>
 								<div class="mb-0.5">

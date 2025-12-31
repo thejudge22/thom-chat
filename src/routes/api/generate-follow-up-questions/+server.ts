@@ -10,7 +10,7 @@ import { auth } from '$lib/auth';
 import { Provider } from '$lib/types';
 import { FOLLOW_UP_QUESTIONS_PROMPT } from '$lib/prompts/follow-up-questions';
 
-const MODEL = 'Qwen/Qwen3-Next-80B-A3B-Instruct';
+const MODEL = 'zai-org/GLM-4.5-Air';
 
 const reqBodySchema = z.object({
 	conversationId: z.string(),

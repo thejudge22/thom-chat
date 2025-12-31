@@ -22,7 +22,7 @@
 		try {
 			const result = await authClient.signUp.email({
 				name: username,
-				email: `${username}@nano.chat`,
+				email: `${username}@thom.chat`,
 				password: password,
 			});
 			if (result.error) {
@@ -43,7 +43,7 @@
 		error = '';
 		try {
 			const result = await authClient.signIn.email({
-				email: `${username}@nano.chat`,
+				email: `${username}@thom.chat`,
 				password: password,
 			});
 			if (result.error) {

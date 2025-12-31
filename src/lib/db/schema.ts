@@ -186,6 +186,7 @@ export const conversations = sqliteTable(
 		public: integer('public', { mode: 'boolean' }).default(false),
 		branchedFrom: text('branched_from'),
 		assistantId: text('assistant_id').references(() => assistants.id),
+		temporary: integer('temporary', { mode: 'boolean' }).default(false),
 		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 	},
 	(table) => [index('conversations_user_id_idx').on(table.userId)]
