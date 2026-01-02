@@ -964,7 +964,18 @@
 								</div>
 							{/if}
 							<div class="relative flex flex-grow flex-row items-start">
-								<input {...fileUpload.input} bind:this={fileInput} />
+								<input
+								{...fileUpload.input}
+								bind:this={fileInput}
+								oninput={(e) => {
+									// Fallback for Chrome Mobile Android where onchange may not fire for images
+									const input = e.currentTarget as HTMLInputElement;
+									if (input.files && input.files.length > 0) {
+										handleFilesSelect(Array.from(input.files));
+										input.value = ''; // Clear to allow re-selection of same file
+									}
+								}}
+							/>
 								<!-- svelte-ignore a11y_autofocus -->
 								<textarea
 									style={popover.trigger.style}
