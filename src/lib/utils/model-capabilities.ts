@@ -21,7 +21,7 @@ export function isImageOnlyModel(model: NanoGPTModel): boolean {
 }
 
 export function supportsReasoning(model: NanoGPTModel): boolean {
-	return false;
+	return model.capabilities?.reasoning ?? false;
 }
 
 export function supportsDocuments(model: NanoGPTModel): boolean {

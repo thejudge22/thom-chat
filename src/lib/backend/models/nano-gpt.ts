@@ -5,6 +5,14 @@ export interface NanoGPTModel {
     name: string;
     created: number;
     description: string;
+    icon_url?: string;
+    owned_by?: string;
+    max_output_tokens?: number;
+    cost_estimate?: number;
+    capabilities?: {
+        vision?: boolean;
+        reasoning?: boolean;
+    };
     // Keeping these compatible with OpenRouter interface if needed, but making them optional
     pricing?: {
         prompt: string;
@@ -43,6 +51,14 @@ export function getNanoGPTModels() {
                 name: m.name || m.id,
                 created: m.created || Date.now(),
                 description: m.description || '',
+                icon_url: m.icon_url,
+                owned_by: m.owned_by,
+                max_output_tokens: m.max_output_tokens,
+                cost_estimate: m.cost_estimate,
+                capabilities: m.capabilities ? {
+                    vision: m.capabilities.vision ?? false,
+                    reasoning: m.capabilities.reasoning ?? false,
+                } : undefined,
                 context_length: m.context_length,
                 architecture: {
                     input_modalities: m.capabilities?.vision ? ['text', 'image'] : ['text'],
