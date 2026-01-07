@@ -121,16 +121,27 @@ Generate images using Nano-GPT's image models with support for:
 
 Save conversations as bookmarks to your KaraKeep instance for long-term storage and organization.
 
+### Model Benchmarks
+
+View performance benchmarks from [Artificial Analysis](https://artificialanalysis.ai) directly in the model picker:
+
+- **For LLMs**: Intelligence Index, Coding Index, Math Index, and Speed (tokens/sec)
+- **For Image Models**: ELO rating and Rank
+- Benchmarks appear in the model info panel (click the info icon on any model)
+- Requires `ARTIFICIAL_ANALYSIS_API_KEY` environment variable
+
+
 ---
 
 ## Environment Variables
 
-| Variable             | Description                                         |
-| -------------------- | --------------------------------------------------- |
-| `DATABASE_URL`       | SQLite database path (default: ./data/nanochat.db)  |
-| `NANOGPT_API_KEY`    | Nano-GPT API key for generation                     |
-| `BETTER_AUTH_SECRET` | Authentication secret                               |
-| `BETTER_AUTH_URL`    | Base URL for authentication                         |
+| Variable                     | Description                                             |
+| ---------------------------- | ------------------------------------------------------- |
+| `DATABASE_URL`               | SQLite database path (default: ./data/nanochat.db)      |
+| `NANOGPT_API_KEY`            | Nano-GPT API key for generation                         |
+| `BETTER_AUTH_SECRET`         | Authentication secret                                   |
+| `BETTER_AUTH_URL`            | Base URL for authentication                             |
+| `ARTIFICIAL_ANALYSIS_API_KEY`| (Optional) API key for model benchmarks from artificialanalysis.ai |
 
 ---
 

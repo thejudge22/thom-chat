@@ -597,3 +597,44 @@ Update a project.
 Delete a project.
 
 **Authentication**: Session (owner only)
+
+---
+
+### Artificial Analysis Benchmarks
+
+#### GET `/api/artificial-analysis/benchmarks`
+Get cached benchmark data from Artificial Analysis for LLM and image models.
+
+**Authentication**: Session
+
+**Response**:
+```json
+{
+  "available": true,
+  "llms": [
+    {
+      "name": "Claude 3.5 Sonnet",
+      "slug": "claude-35-sonnet",
+      "evaluations": {
+        "intelligence_index": 64.2,
+        "coding_index": 72.1,
+        "math_index": 68.5
+      },
+      "median_output_tokens_per_second": 92.5
+    }
+  ],
+  "imageModels": [
+    {
+      "name": "DALL-E 3",
+      "slug": "dalle-3",
+      "elo": 1180,
+      "rank": 5
+    }
+  ]
+}
+```
+
+**Notes**:
+- Returns `{ "available": false }` if `ARTIFICIAL_ANALYSIS_API_KEY` is not configured
+- Data is cached server-side for 1 hour to minimize API calls
+- Used by the model info panel to display performance benchmarks
