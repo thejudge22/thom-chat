@@ -37,6 +37,7 @@ import {
 	formatScrapedContent,
 } from '$lib/backend/url-scraper';
 import { supportsVideo } from '$lib/utils/model-capabilities';
+import { decryptApiKey, isEncrypted } from '$lib/encryption';
 import {
 	checkAndUpdateDailyLimit,
 	isWebDisabledForServerKey,
@@ -147,8 +148,20 @@ async function getUserIdFromApiKey(authHeader: string | null): Promise<Result<st
 	}
 
 	try {
-		const apiKeyRecord = await db.query.apiKeys.findFirst({
-			where: eq(apiKeys.key, keyValue),
+		// Get all API keys for the user and compare after decryption
+		const allApiKeys = await db.query.apiKeys.findMany();
+
+		// Find matching key by decrypting each one
+		const apiKeyRecord = allApiKeys.find((record) => {
+			try {
+				const decryptedKey = isEncrypted(record.key)
+					? decryptApiKey(record.key)
+					: record.key;
+				return decryptedKey === keyValue;
+			} catch {
+				// If decryption fails, skip this record
+				return false;
+			}
 		});
 
 		if (!apiKeyRecord) {
@@ -1294,7 +1307,10 @@ export const POST: RequestHandler = async ({ request }) => {
 	let actualKey: string;
 	let usingServerKey = false;
 	if (keyRecord?.key) {
-		actualKey = keyRecord.key;
+		// Decrypt the key if it's encrypted
+		actualKey = isEncrypted(keyRecord.key)
+			? decryptApiKey(keyRecord.key)
+			: keyRecord.key;
 		log('Using user API key', startTime);
 	} else if (process.env.NANOGPT_API_KEY) {
 		actualKey = process.env.NANOGPT_API_KEY;

@@ -9,6 +9,7 @@ import { db } from '$lib/db';
 import { userKeys, userRules } from '$lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '$lib/auth';
+import { decryptApiKey, isEncrypted } from '$lib/encryption';
 
 const MODEL = 'zai-org/glm-4.6v';
 
@@ -66,6 +67,9 @@ export const POST: RequestHandler = async ({ request }) => {
 	]);
 
 	let apiKey = keyRecord?.key;
+	if (apiKey && isEncrypted(apiKey)) {
+		apiKey = decryptApiKey(apiKey);
+	}
 	if (!apiKey && process.env.NANOGPT_API_KEY) {
 		apiKey = process.env.NANOGPT_API_KEY;
 	}

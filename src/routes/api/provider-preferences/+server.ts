@@ -4,6 +4,7 @@ import { userKeys } from '$lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod/v4';
 import { auth } from '$lib/auth';
+import { decryptApiKey, isEncrypted } from '$lib/encryption';
 
 // Schema for provider preferences
 const providerPreferencesSchema = z.object({
@@ -26,7 +27,12 @@ async function getNanoGPTKey(userId: string) {
             eq(userKeys.provider, 'nanogpt')
         ),
     });
-    return userKey?.key;
+    if (!userKey?.key) return undefined;
+    // Decrypt if encrypted
+    if (isEncrypted(userKey.key)) {
+        return decryptApiKey(userKey.key);
+    }
+    return userKey.key;
 }
 
 /**

@@ -6,6 +6,7 @@ import { eq, and } from 'drizzle-orm';
 import { auth } from '$lib/auth';
 import { z } from 'zod/v4';
 import { randomUUID } from 'crypto';
+import { encryptApiKey, decryptApiKey, isEncrypted } from '$lib/encryption';
 
 async function getSessionUserId(request: Request): Promise<string> {
     const session = await auth.api.getSession({ headers: request.headers });
@@ -51,15 +52,18 @@ export const POST: RequestHandler = async ({ request }) => {
     const keyValue = `nc_${randomUUID().replace(/-/g, '')}`;
     const now = new Date();
 
+    // Encrypt the key before storing
+    const encryptedKey = encryptApiKey(keyValue);
+
     await db.insert(apiKeys).values({
         id: keyId,
         userId: userId,
-        key: keyValue,
+        key: encryptedKey,
         name: parsed.data.name,
         createdAt: now,
     });
 
-    // Return the key value ONLY on creation
+    // Return the key value ONLY on creation (unencrypted)
     return json({
         id: keyId,
         key: keyValue,

@@ -175,6 +175,16 @@ Generate videos using NanoGPT's video models:
 | `BETTER_AUTH_SECRET`         | Authentication secret                                   |
 | `BETTER_AUTH_URL`            | Base URL for authentication                             |
 | `ARTIFICIAL_ANALYSIS_API_KEY`| (Optional) API key for model benchmarks from artificialanalysis.ai |
+| `ENCRYPTION_KEY`             | (Optional) Encryption key for API keys at rest. Generate with `openssl rand -base64 32` |
+
+### API Key Encryption
+
+The application supports encrypting API keys stored in the database using AES-256-GCM:
+
+- **Optional**: The app works without `ENCRYPTION_KEY` (keys stored in plain text)
+- **Recommended**: Set `ENCRYPTION_KEY` to encrypt all API keys at rest
+- **Migration**: Run `bun run scripts/migrate-encrypt-api-keys.ts` to encrypt existing keys
+- **Details**: See [`scripts/README-API-KEY-ENCRYPTION.md`](scripts/README-API-KEY-ENCRYPTION.md)
 
 ---
 

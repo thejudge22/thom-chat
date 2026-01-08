@@ -3,6 +3,7 @@ import { db } from '$lib/db';
 import { userKeys } from '$lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '$lib/auth';
+import { decryptApiKey, isEncrypted } from '$lib/encryption';
 
 /**
  * GET /api/model-providers?modelId=xxx
@@ -29,7 +30,12 @@ export const GET: RequestHandler = async ({ url, request }) => {
         ),
     });
 
-    if (!userKey?.key) {
+    let apiKey = userKey?.key;
+    if (apiKey && isEncrypted(apiKey)) {
+        apiKey = decryptApiKey(apiKey);
+    }
+
+    if (!apiKey) {
         // Return empty response if no API key - model doesn't support provider selection for this user
         return json({
             canonicalId: modelId,
@@ -43,7 +49,7 @@ export const GET: RequestHandler = async ({ url, request }) => {
         // Fetch providers from NanoGPT API
         const response = await fetch(`https://nano-gpt.com/api/models/${encodeURIComponent(modelId)}/providers`, {
             headers: {
-                'Authorization': `Bearer ${userKey.key}`,
+                'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
             },
         });

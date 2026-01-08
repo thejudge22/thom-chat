@@ -169,6 +169,7 @@ List active API keys for the current user.
   ]
 }
 ```
+**Note**: The actual key value is never returned in list responses.
 
 #### POST `/api/api-keys`
 Create a new API key.
@@ -191,6 +192,7 @@ Create a new API key.
   "createdAt": "date"
 }
 ```
+**Note**: The key is returned only during creation. Save it securely - it cannot be retrieved again. Keys are stored encrypted in the database using AES-256-GCM.
 
 #### DELETE `/api/api-keys`
 Revoke an API key.

@@ -9,6 +9,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { auth } from '$lib/auth';
 import { Provider } from '$lib/types';
 import { FOLLOW_UP_QUESTIONS_PROMPT } from '$lib/prompts/follow-up-questions';
+import { decryptApiKey, isEncrypted } from '$lib/encryption';
 
 const MODEL = 'zai-org/GLM-4.5-Air';
 
@@ -55,6 +56,9 @@ export const POST: RequestHandler = async ({ request }) => {
 	});
 
 	let apiKey = keyRecord?.key;
+	if (apiKey && isEncrypted(apiKey)) {
+		apiKey = decryptApiKey(apiKey);
+	}
 	if (!apiKey && process.env.NANOGPT_API_KEY) {
 		apiKey = process.env.NANOGPT_API_KEY;
 	}
