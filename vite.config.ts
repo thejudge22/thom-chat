@@ -1,4 +1,3 @@
-/// <reference types="vitest" />
 import tailwindcss from '@tailwindcss/vite';
 import { svelteTesting } from '@testing-library/svelte/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
@@ -8,13 +7,8 @@ import { defineConfig } from 'vitest/config';
 const isDev = process.env.NODE_ENV === 'development';
 
 export default defineConfig({
-	plugins: [
-		tailwindcss(),
-		sveltekit(),
-		Icons({
-			compiler: 'svelte',
-		}),
-	],
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	plugins: [tailwindcss() as any, sveltekit() as any, Icons({ compiler: 'svelte' }) as any],
 	server: {
 		allowedHosts: isDev ? true : undefined,
 	},
@@ -26,7 +20,8 @@ export default defineConfig({
 		projects: [
 			{
 				extends: './vite.config.ts',
-				plugins: [svelteTesting()],
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				plugins: [svelteTesting() as any],
 				test: {
 					name: 'client',
 					environment: 'jsdom',

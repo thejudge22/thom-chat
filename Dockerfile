@@ -7,8 +7,7 @@ COPY package.json bun.lock ./
 
 # Install all dependencies (including dev) with frozen lockfile
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile
-
+    bun install
 # Copy source code
 COPY . .
 
@@ -39,7 +38,7 @@ COPY --from=builder /app/src/lib/db/schema.ts ./src/lib/db/schema.ts
 
 # Install production dependencies only with frozen lockfile
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --production --frozen-lockfile
+    bun install --production
 
 # Ensure data directory exists
 RUN mkdir -p data

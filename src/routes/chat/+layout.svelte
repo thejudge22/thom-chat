@@ -1256,19 +1256,39 @@
 											</Tooltip>
 										{/if}
 										{#if currentModelSupportsReasoning}
-											<button
-												type="button"
-												class={cn(
-													'bg-secondary/50 hover:bg-secondary text-muted-foreground flex size-8 items-center justify-center rounded-lg transition-colors',
-													settings.reasoningEffort !== 'low' &&
-														'bg-primary/20 text-primary border-primary/50'
-												)}
-												onclick={() =>
-													(settings.reasoningEffort =
-														settings.reasoningEffort === 'low' ? 'medium' : 'low')}
-											>
-												<BrainIcon class="size-4" />
-											</button>
+											<Tooltip>
+												{#snippet trigger(tooltip)}
+													<button
+														type="button"
+														class={cn(
+															'bg-secondary/50 hover:bg-secondary text-muted-foreground flex h-8 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors',
+															settings.reasoningEffort === 'medium' && 'bg-primary/20 text-primary',
+															settings.reasoningEffort === 'high' &&
+																'bg-amber-500/20 text-amber-500'
+														)}
+														onclick={() => {
+															if (settings.reasoningEffort === 'low')
+																settings.reasoningEffort = 'medium';
+															else if (settings.reasoningEffort === 'medium')
+																settings.reasoningEffort = 'high';
+															else settings.reasoningEffort = 'low';
+														}}
+														{...tooltip.trigger}
+													>
+														<BrainIcon class="size-4" />
+														{settings.reasoningEffort === 'low'
+															? 'Think'
+															: settings.reasoningEffort === 'medium'
+																? 'Think'
+																: 'Think+'}
+													</button>
+												{/snippet}
+												{settings.reasoningEffort === 'low'
+													? 'Extended Thinking: Off — Click to enable step-by-step reasoning'
+													: settings.reasoningEffort === 'medium'
+														? 'Extended Thinking: Medium — AI reasons before responding (uses more tokens)'
+														: 'Extended Thinking: High — Deep reasoning for complex problems (uses most tokens)'}
+											</Tooltip>
 										{/if}
 										<Tooltip>
 											{#snippet trigger(tooltip)}
@@ -1355,12 +1375,25 @@
 												{/if}
 												{#if currentModelSupportsReasoning}
 													<DropdownMenu.Item
-														onclick={() =>
-															(settings.reasoningEffort =
-																settings.reasoningEffort === 'low' ? 'medium' : 'low')}
+														onclick={() => {
+															if (settings.reasoningEffort === 'low')
+																settings.reasoningEffort = 'medium';
+															else if (settings.reasoningEffort === 'medium')
+																settings.reasoningEffort = 'high';
+															else settings.reasoningEffort = 'low';
+														}}
 													>
-														<BrainIcon class="mr-2 size-4" />
-														Reasoning: {settings.reasoningEffort === 'low' ? 'Off' : 'On'}
+														<BrainIcon
+															class={cn('mr-2 size-4', {
+																'text-primary': settings.reasoningEffort === 'medium',
+																'text-amber-500': settings.reasoningEffort === 'high',
+															})}
+														/>
+														Thinking: {settings.reasoningEffort === 'low'
+															? 'Off'
+															: settings.reasoningEffort === 'medium'
+																? 'Medium'
+																: 'High'}
 													</DropdownMenu.Item>
 												{/if}
 												<DropdownMenu.Item
